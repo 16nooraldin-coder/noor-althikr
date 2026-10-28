@@ -1,0 +1,62 @@
+
+name: Build Noor Althikr APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**.html'
+      - '.github/workflows/build-apk.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Prepare web app
+        run: |
+          mkdir -p www
+          HTML_FILE=$(find . -maxdepth 1 -type f -name '*.html' | head -n 1)
+          if [ -z "$HTML_FILE" ]; then
+            echo "No HTML file found in repository root"
+            exit 1
+          fi
+          cp "$HTML_FILE" www/index.html
+          npm init -y
+          npm install @capacitor/core@7 @capacitor/android@7
+          npm install --save-dev @capacitor/cli@7
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.nooralthikr.app",
+            "appName": "نور الذكر",
+            "webDir": "www"
+          }
+          EOF
+          npx cap add android
+          npx cap sync android
+
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Noor-Althikr-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
